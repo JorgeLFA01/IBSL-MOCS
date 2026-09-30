@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>IBSL - Plataforma de Evaluaciones</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <div class="top"><div class="brand">IBSL · Plataforma de Evaluaciones</div><div id="who" class="badge hidden"></div><button id="logoutBtn" class="btn hidden" onclick="logout()">Salir</button></div>
+  <div id="loginView" class="wrap">
+    <div class="card login"><h1>Acceso</h1><p class="small">Alumnos, maestros y Coordinación utilizan esta misma página.</p><label>Usuario</label><input id="loginUser" autocomplete="username"><label>Contraseña / PIN</label><input id="loginPass" type="password" autocomplete="current-password"><button class="btn primary" style="width:100%;margin-top:14px" onclick="login()">Entrar</button><div id="loginMsg"></div><p class="small" style="margin-top:14px">Si entraste desde un QR, el usuario puede aparecer automáticamente.</p></div>
+  </div>
+  <div id="staffView" class="hidden layout"><aside class="side" id="sidebar"></aside><main class="content" id="staffContent"></main></div>
+  <div id="studentView" class="hidden wrap"><div id="studentContent"></div></div>
+</div>
+<div id="modal" class="modal hidden"><div class="modalbox"><div id="modalBody"></div><button class="btn" style="width:100%;margin-top:12px" onclick="closeModal()">Cerrar</button></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
