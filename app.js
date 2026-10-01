@@ -438,16 +438,66 @@ function roleName(r){return r==='COORDINATOR'?'Coordinación':r==='TEACHER'?'Mae
 function renderSidebar(){const c=state.profile.role==='COORDINATOR';const items=[['home','Inicio'],['students','Alumnos'],['exams',c?'Exámenes y preguntas':'Control de exámenes'],['results','Resultados']];if(c)items.splice(1,0,['groups','Grados y grupos'],['teachers','Maestros']);byId('sidebar').innerHTML=items.map(x=>`<button class="navbtn ${state.section===x[0]?'active':''}" onclick="renderStaff('${x[0]}')">${x[1]}</button>`).join('')}
 function renderStaff(sec){state.section=sec;renderSidebar();if(sec==='home')return renderHome();if(sec==='groups')return renderGroups();if(sec==='teachers')return renderTeachers();if(sec==='students')return renderStudents();if(sec==='exams')return renderExams();if(sec==='results')return renderResults();}
 function renderHome(){
-  const d=state.data, students=d.students||[],groups=d.groups||[],exams=d.exams||[];
-  byId('staffContent').innerHTML=`<h2>Dashboard</h2><div class="stats"><div class="stat"><span>Alumnos</span><b>${students.length}</b></div><div class="stat"><span>Grupos</span><b>${groups.length}</b></div><div class="stat"><span>Exámenes</span><b>${exams.length}</b></div><div class="stat"><span>Rol</span><b style="font-size:18px">${roleName(state.profile.role)}</b></div></div><div id="homeDashboard"><div class="card">Cargando rendimiento...</div></div>`;
+  byId('staffContent').innerHTML=`<div class="home-head"><div><h2>Rendimiento por grupo</h2><p class="small">Selecciona un grupo para ver su información. Los grupos permanecen minimizados para que el panorama general sea fácil de leer.</p></div></div><div class="performance-legend"><span><i class="legend-dot no-data"></i>Sin evaluaciones</span><span><i class="legend-dot high"></i>85–100%</span><span><i class="legend-dot medium"></i>70–84%</span><span><i class="legend-dot developing"></i>50–69%</span><span><i class="legend-dot low"></i>Menos de 50%</span></div><div id="homeDashboard"><div class="card">Cargando grupos...</div></div>`;
   loadHomeDashboard();
 }
 async function loadHomeDashboard(){
   try{
     const r=await rpc('results',{});
     const box=byId('homeDashboard');
-    if(box) box.innerHTML=dashboardHtml(r.rows||[],r.eligibleCount||0,true);
+    if(box) box.innerHTML=groupAccordionDashboardHtml(r.rows||[]);
   }catch(e){const box=byId('homeDashboard');if(box)box.innerHTML='<div class="msg err">'+esc(e.message)+'</div>'}
+}
+function homePerfBand(p,hasData=true){
+  if(!hasData)return{label:'Sin evaluaciones',cls:'no-data'};
+  if(p>=85)return{label:'Rendimiento alto',cls:'high'};
+  if(p>=70)return{label:'Rendimiento adecuado',cls:'medium'};
+  if(p>=50)return{label:'En desarrollo',cls:'developing'};
+  return{label:'Requiere atención',cls:'low'};
+}
+function groupAccordionDashboardHtml(rows){
+  const groups=state.data.groups||[], students=state.data.students||[];
+  if(!groups.length)return `<div class="card empty-dashboard"><h3>No hay grupos disponibles</h3><p class="small">Cuando se asignen grupos aparecerán aquí.</p></div>`;
+  const latest=latestDashboardRows(rows||[]);
+  return `<div class="group-accordion">${groups.map((g,idx)=>{
+    const gr=latest.filter(x=>x.groupId===g.id);
+    const totalStudents=students.filter(s=>s.groupId===g.id&&s.active!==false).length;
+    const evaluated=new Set(gr.map(x=>x.studentId)).size;
+    const pending=Math.max(0,totalStudents-evaluated);
+    const hasData=gr.length>0;
+    const avg=hasData?avgNum(gr.map(x=>x.percent)):0;
+    const reading=hasData?avgNum(gr.map(x=>x.readingPercent).filter(x=>x!==null)):0;
+    const language=hasData?avgNum(gr.map(x=>x.languagePercent).filter(x=>x!==null)):0;
+    const oral=hasData?avgNum(gr.map(x=>x.oralPercent).filter(x=>x!==null)):0;
+    const perf=homePerfBand(avg,hasData);
+    const interpret=hasData?perfBand(avg):['Sin evaluaciones','Aún no hay resultados registrados para este grupo.',''];
+    return `<div class="group-summary ${perf.cls}">
+      <button class="group-summary-head" type="button" onclick="toggleGroupSummary('grpDash${idx}',this)">
+        <span class="group-title">${esc(groupName(g.id))}</span>
+        <span class="group-status">${hasData?avg+'% · ':''}${esc(perf.label)}</span>
+        <span class="group-chevron">⌄</span>
+      </button>
+      <div class="group-summary-body" id="grpDash${idx}">
+        <div class="mini-stats">
+          <div><span>Promedio</span><b>${hasData?avg+'%':'—'}</b></div>
+          <div><span>Evaluados</span><b>${evaluated}</b></div>
+          <div><span>Pendientes</span><b>${pending}</b></div>
+          <div><span>Evaluaciones</span><b>${gr.length}</b></div>
+        </div>
+        ${hasData?`<div class="group-detail-grid"><div><h4>Rendimiento por área</h4>${barRow('Reading',reading)}${barRow('Language',language)}${barRow('Oral',oral)}</div><div class="group-interpretation"><div class="small">Interpretación</div><h4>${esc(interpret[0])}</h4><p>${esc(interpret[1])}</p><button class="btn mini" onclick="event.stopPropagation();openResultsForGroup('${g.id}')">Ver resultados del grupo</button></div></div>`:`<div class="no-eval-note">Todavía no hay evaluaciones para este grupo.</div>`}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+function toggleGroupSummary(id,btn){
+  const body=byId(id);
+  if(!body)return;
+  const open=body.classList.toggle('open');
+  btn.classList.toggle('open',open);
+}
+function openResultsForGroup(groupId){
+  renderStaff('results');
+  setTimeout(()=>{if(byId('rGroup')){byId('rGroup').value=groupId;loadResults();}},0);
 }
 function gradeName(id){return (state.data.grades.find(x=>x.id===id)||{}).name||''} function groupName(id){const g=state.data.groups.find(x=>x.id===id)||{};return gradeName(g.gradeId)+' '+(g.name||'')}
 function renderGroups(){const gs=state.data.grades||[],groups=state.data.groups||[],teachers=state.data.users||[];byId('staffContent').innerHTML=`<h2>Grados y grupos</h2><div class="grid2"><div class="card"><h3>Agregar grado</h3><label>Nombre</label><input id="gradeName" placeholder="Ej. 7° Primaria"><label>Orden</label><input id="gradeSort" type="number" value="7"><button class="btn primary" style="margin-top:10px" onclick="addGrade()">Agregar grado</button></div><div class="card"><h3>Agregar grupo</h3><label>Grado</label><select id="groupGrade">${gs.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select><label>Grupo</label><input id="groupName" placeholder="A"><label>Maestro (opcional)</label><select id="groupTeacher"><option value="">Sin asignar</option>${teachers.map(t=>`<option value="${t.teacherId||t.id}">${esc(t.name)}</option>`).join('')}</select><button class="btn primary" style="margin-top:10px" onclick="addGroup()">Agregar grupo</button></div></div><div class="card" style="margin-top:14px"><h3>Grupos actuales</h3><div class="tablewrap"><table><tr><th>Grado</th><th>Grupo</th><th>Maestro ID</th></tr>${groups.map(g=>`<tr><td>${esc(gradeName(g.gradeId))}</td><td>${esc(g.name)}</td><td>${esc(g.teacherId||'Sin asignar')}</td></tr>`).join('')}</table></div></div>`}
